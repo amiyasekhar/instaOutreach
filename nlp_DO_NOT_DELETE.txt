@@ -1,0 +1,167 @@
+# from transformers import BertTokenizer, BertModel
+from sentence_transformers import SentenceTransformer
+import torch
+import numpy as np
+import faiss
+
+# Example bios including emojis
+bios = ["AI-driven entrepreneur 🚀 | DM for collabs",
+"Founder @TechWaveAI | Innovating the future",
+"Crypto wizard 🔮 | Trading tips & tricks",
+"E-commerce strategist | Scaling online businesses",
+"Building the future of tech @InnovateAI",
+"AI & Blockchain enthusiast | Let’s connect!",
+"Marketing guru | Specializing in SEO & growth",
+"Founder @CryptoBoost | Blockchain is the future",
+"AI researcher | Exploring the edge of technology",
+"E-commerce expert | Growing brands globally",
+"Crypto investor | Always looking for the next big thing",
+"Digital marketing specialist | Helping brands grow",
+"Tech entrepreneur | AI & ML at the core",
+"Blockchain believer | Trading insights daily",
+"SEO expert | Boosting online visibility",
+"Founder @AIWave | Transforming industries",
+"Crypto & AI aficionado | DM for collabs",
+"Building smarter tech @NextGenAI",
+"E-commerce wizard | Scaling businesses worldwide",
+"Blockchain expert | Crypto tips inside 🚀",
+"AI innovator | Shaping the digital future",
+"Digital marketing pro | Expert in e-commerce",
+"Crypto trader | Blockchain enthusiast 💰",
+"Tech founder | AI & ML leading the way",
+"E-commerce growth strategist | Building brands",
+"Blockchain fanatic | Trading secrets revealed",
+"SEO master | Helping businesses rank higher",
+"AI startup founder | Innovating the future",
+"Crypto expert | Blockchain believer 🚀",
+"Digital marketing ninja | Scaling online stores",
+"Founder @AIRevolution | Redefining tech",
+"E-commerce specialist | Global growth strategist",
+"Blockchain and crypto enthusiast | Daily updates",
+"AI-driven entrepreneur | Building smarter tech",
+"SEO and e-commerce expert | Boosting brands",
+"Founder @CryptoInsight | Blockchain innovator",
+"Digital marketing maven | E-commerce growth",
+"AI and ML enthusiast | Shaping tomorrow",
+"Crypto investor | Blockchain trends 🚀",
+"E-commerce expert | Scaling global brands",
+"AI startup founder | Innovating with tech",
+"SEO specialist | Helping brands get noticed",
+"Blockchain believer | Crypto insights inside",
+"Tech visionary | AI & Blockchain at the core",
+"E-commerce growth hacker | Scaling worldwide",
+"Crypto trader | Blockchain enthusiast 💰🚀",
+"ceo @gyasmma dm to learn more",
+"ecommerce. crypto. AI",
+"Founder of a tech startup focusing on AI and machine learning",
+"Digital marketing expert specializing in e-commerce and SEO",
+"Blockchain enthusiast and cryptocurrency trader 💰🚀"]
+
+# Load pre-trained model tokenizer and model
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+model = BertModel.from_pretrained('bert-base-uncased')
+
+# Tokenize and create embeddings
+inputs = tokenizer(bios, return_tensors='pt', padding=True, truncation=True)
+print("Input IDs shape:", inputs['input_ids'].shape)
+
+with torch.no_grad():
+    embeddings = model(**inputs)
+    print("Embeddings shape:", embeddings.last_hidden_state.shape)
+    bio_embeddings = torch.mean(embeddings.last_hidden_state, dim=1).detach().numpy()
+    print("Bio Embeddings shape:", bio_embeddings.shape)
+
+    # Ensure bio_embeddings has the correct shape 
+    if bio_embeddings.shape[0] > 0 and bio_embeddings.shape[1] > 0:
+        dimension = bio_embeddings.shape[1]
+    else:
+        raise ValueError("Embeddings not generated correctly, check the input and model.")
+
+# Initialize FAISS index
+index = faiss.IndexFlatL2(dimension)
+
+# Add embeddings to the index
+index.add(bio_embeddings)
+
+# Define a query bio and embed it
+query_bio = "Looking for opportunities in AI and e-commerce 🚀"
+query_input = tokenizer(query_bio, return_tensors='pt', padding=True, truncation=True)
+
+with torch.no_grad():
+    query_embedding = model(**query_input)
+    query_embedding = torch.mean(query_embedding.last_hidden_state, dim=1).detach().numpy()
+
+# Search for the most similar bios
+k = 2# number of nearest neighbors
+distances, indices = index.search(query_embedding, k)
+
+print("Most similar bios:")
+for i in range(k):
+    print(f"Bio: {bios[indices[0][i]]}, Score: {distances[0][i]}")
+
+
+
+can we use a combination of word movers distance, cosine similarity, and jaccard similarity 
+
+for example, 
+
+Yes, using a BERT-based model (or its variants like RoBERTa or DistilBERT) can be beneficial for what you're trying to achieve, especially if you want to capture more nuanced and contextual similarities between Instagram bios. Here’s why:
+
+1. Contextual Understanding:
+BERT models are trained to understand the context of words in a sentence by considering the words that come before and after. This is particularly useful when dealing with complex bios that might use different expressions or synonyms to convey similar meanings.
+For example, BERT would understand that "AI researcher" and "Exploring the edge of technology" might be related, even though they don't share many words in common.
+2. Capturing Synonyms and Semantic Relationships:
+BERT-based models are pre-trained on large text corpora and fine-tuned on specific tasks, which enables them to understand synonyms and related concepts better than simpler models like Word2Vec. This helps when comparing bios that use different terms to describe similar activities (e.g., "crypto trading" vs. "cryptocurrency investment").
+3. Fine-Tuning Capabilities:
+You can fine-tune BERT on a dataset of bios labeled as similar or dissimilar, which can significantly enhance its ability to understand the specific nuances of the bios in your dataset. Fine-tuning can help the model learn the specific language and expressions used in the niche community you’re targeting.
+4. Better Performance on Text Similarity Tasks:
+BERT and its variants have shown superior performance on text similarity tasks in various benchmarks. If you’re using cosine similarity as your primary measure, BERT-based embeddings will likely provide more accurate and meaningful results.
+Example of Using BERT for Your Task:
+python
+Copy code
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+# Load a BERT-based model
+model = SentenceTransformer('bert-base-nli-mean-tokens')
+
+# Example bios
+bios = [
+    "AI-driven entrepreneur 🚀 | DM for collabs",
+    "Founder @TechWaveAI | Innovating the future",
+    "Crypto wizard 🔮 | Trading tips & tricks"
+]
+
+# Query bio
+query_bio = "Blockchain expert | Crypto tips inside 🚀"
+
+# Generate embeddings
+bio_embeddings = model.encode(bios)
+query_embedding = model.encode([query_bio])
+
+# Calculate cosine similarity
+similarities = cosine_similarity([query_embedding], bio_embeddings)[0]
+
+# Output the results
+for bio, similarity in zip(bios, similarities):
+    print(f"Bio: {bio}, Similarity: {similarity}")
+Should You Use BERT?
+Use BERT if:
+
+You need a more nuanced understanding of the bios and want the model to capture deeper semantic relationships.
+You plan to fine-tune the model on a specific dataset related to your niche, which could lead to even better results.
+You want to improve the performance of your cosine similarity layer by providing it with richer embeddings.
+Stick with simpler models (like Word2Vec) if:
+
+You are constrained by computational resources, as BERT models are more resource-intensive.
+Your bios are relatively simple and don't require deep contextual understanding.
+You are satisfied with the performance of simpler models in your current setup.
+Conclusion:
+For your task, BERT-based models will likely provide a more sophisticated and accurate understanding of bio similarities, especially if the bios are complex and context-dependent. If you have the resources and are looking for better performance, switching to BERT (or another transformer model) would be a good choice.
+
+
+
+
+
+
